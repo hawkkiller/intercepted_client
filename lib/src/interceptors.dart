@@ -92,15 +92,25 @@ final class _HttpInterceptorWrapper extends HttpInterceptor {
   }
 }
 
-final class _TaskQueue<T> extends QueueList<T> {
-  bool _isRunning = false;
-}
+typedef _Task = FutureOr<dynamic> Function();
 
-/// Pair of value and handler.
-typedef _ValueHandler<T extends Object, H extends Handler> = ({
-  T value,
-  H handler,
-});
+final class _TaskQueue extends QueueList<_Task> {
+  bool get isProcessing => length > 0;
+  Future<void>? _processing;
+
+  @override
+  void add(_Task element) {
+    super.add(element);
+    _run();
+  }
+
+  void _run() => _processing ??= Future(() async {
+        while (isProcessing) {
+          await removeFirst()();
+        }
+        _processing = null;
+      });
+}
 
 /// Sequential interceptor is type of [HttpInterceptor] that maintains
 /// queues of requests and responses. It is used to intercept requests and
@@ -121,9 +131,9 @@ class SequentialHttpInterceptor extends HttpInterceptor {
         interceptError: interceptError,
       );
 
-  final _requestQueue = _TaskQueue<_ValueHandler<BaseRequest, RequestHandler>>();
-  final _responseQueue = _TaskQueue<_ValueHandler<Response, ResponseHandler>>();
-  final _errorQueue = _TaskQueue<_ValueHandler<Object, ErrorHandler>>();
+  final _requestQueue = _TaskQueue();
+  final _responseQueue = _TaskQueue();
+  final _errorQueue = _TaskQueue();
 
   /// Method that enqueues the request.
   void _interceptRequest(BaseRequest request, RequestHandler handler) =>
@@ -142,29 +152,17 @@ class SequentialHttpInterceptor extends HttpInterceptor {
       );
 
   void _queuedHandler<T extends Object, H extends Handler>(
-    _TaskQueue<_ValueHandler<T, H>> taskQueue,
+    _TaskQueue taskQueue,
     T value,
     H handler,
-    void Function(T value, H handler) intercept,
-  ) {
-    final task = (value: value, handler: handler);
-    task.handler._processNextInQueue = () {
-      if (taskQueue.isNotEmpty) {
-        final nextTask = taskQueue.removeFirst();
-        intercept(nextTask.value, nextTask.handler);
-      } else {
-        taskQueue._isRunning = false;
-      }
-    };
-
-    taskQueue.add(task);
-
-    if (!taskQueue._isRunning) {
-      taskQueue._isRunning = true;
-      final task = taskQueue.removeFirst();
-      intercept(task.value, task.handler);
-    }
-  }
+    Interceptor<T, H> interceptor,
+  ) =>
+      taskQueue.add(
+        () async {
+          interceptor(value, handler);
+          return handler.future;
+        },
+      );
 }
 
 final class _SequentialHttpInterceptorWrapper extends SequentialHttpInterceptor {

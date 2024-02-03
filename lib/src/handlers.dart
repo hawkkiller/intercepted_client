@@ -2,10 +2,9 @@ part of 'client.dart';
 
 /// BaseHandler
 abstract base class Handler {
-  final _completer = Completer<InterceptorState>();
+  Handler();
 
-  /// Callback that is used to process the next interceptor in the queue.
-  void Function()? _processNextInQueue;
+  final _completer = Completer<InterceptorState>();
 
   /// Returns the future of the handler.
   Future<InterceptorState> get future => _completer.future;
@@ -24,13 +23,11 @@ final class RequestHandler extends Handler {
         action: next ? InterceptorAction.next : InterceptorAction.reject,
       ),
     );
-    _processNextInQueue?.call();
   }
 
   /// Goes to the next interceptor.
   void next(BaseRequest request) {
     _completer.complete(InterceptorState(value: request));
-    _processNextInQueue?.call();
   }
 
   /// Resolves the request.
@@ -41,7 +38,6 @@ final class RequestHandler extends Handler {
         action: next ? InterceptorAction.resolveNext : InterceptorAction.resolve,
       ),
     );
-    _processNextInQueue?.call();
   }
 }
 
@@ -58,7 +54,6 @@ final class ResponseHandler extends Handler {
         action: next ? InterceptorAction.rejectNext : InterceptorAction.reject,
       ),
     );
-    _processNextInQueue?.call();
   }
 
   /// Resolves the response.
@@ -69,13 +64,11 @@ final class ResponseHandler extends Handler {
         action: next ? InterceptorAction.resolveNext : InterceptorAction.resolve,
       ),
     );
-    _processNextInQueue?.call();
   }
 
   /// Goes to the next interceptor.
   void next(Response response) {
     _completer.complete(InterceptorState(value: response));
-    _processNextInQueue?.call();
   }
 }
 
@@ -92,7 +85,6 @@ final class ErrorHandler extends Handler {
         action: next ? InterceptorAction.rejectNext : InterceptorAction.reject,
       ),
     );
-    _processNextInQueue?.call();
   }
 
   /// Resolves with response.
@@ -100,12 +92,10 @@ final class ErrorHandler extends Handler {
     _completer.complete(
       InterceptorState(value: response, action: InterceptorAction.resolve),
     );
-    _processNextInQueue?.call();
   }
 
   /// Goes to the next interceptor.
   void next(Object error, [StackTrace? stackTrace]) {
     _completer.completeError(InterceptorState(value: error), stackTrace);
-    _processNextInQueue?.call();
   }
 }
