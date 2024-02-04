@@ -1,7 +1,6 @@
 name: intercepted_client
-description: A starting point for Dart libraries or applications.
-version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+description: Interceptors for http package that support concurrent requests.
+version: 0.0.1
 
 environment:
   sdk: ^3.0.5
@@ -10,7 +9,6 @@ environment:
 dependencies:
   collection: ^1.18.0
   http: ^1.1.0
-  # path: ^1.8.0
 
 dev_dependencies:
   lints: ^2.0.0
