@@ -26,7 +26,7 @@ class AuthInterceptor extends SequentialHttpInterceptor {
   }
 
   @override
-  void interceptResponse(Response response, ResponseHandler handler) {
+  void interceptResponse(StreamedResponse response, ResponseHandler handler) {
     if (response.statusCode == 401) {
       // Refresh token and retry request
     }

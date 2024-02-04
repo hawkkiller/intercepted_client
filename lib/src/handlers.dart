@@ -31,7 +31,7 @@ final class RequestHandler extends Handler {
   }
 
   /// Resolves the request.
-  void resolve(Response response, {bool next = false}) {
+  void resolve(StreamedResponse response, {bool next = false}) {
     _completer.complete(
       InterceptorState(
         value: response,
@@ -57,7 +57,7 @@ final class ResponseHandler extends Handler {
   }
 
   /// Resolves the response.
-  void resolve(Response response, {bool next = false}) {
+  void resolve(StreamedResponse response, {bool next = false}) {
     _completer.complete(
       InterceptorState(
         value: response,
@@ -67,7 +67,7 @@ final class ResponseHandler extends Handler {
   }
 
   /// Goes to the next interceptor.
-  void next(Response response) {
+  void next(StreamedResponse response) {
     _completer.complete(InterceptorState(value: response));
   }
 }
@@ -88,7 +88,7 @@ final class ErrorHandler extends Handler {
   }
 
   /// Resolves with response.
-  void resolve(Response response) {
+  void resolve(StreamedResponse response) {
     _completer.complete(
       InterceptorState(value: response, action: InterceptorAction.resolve),
     );

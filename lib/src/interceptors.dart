@@ -32,7 +32,7 @@ class HttpInterceptor {
   /// Creates a new [HttpInterceptor] from the given handlers.
   factory HttpInterceptor.fromHandlers({
     Interceptor<BaseRequest, RequestHandler, void>? interceptRequest,
-    Interceptor<Response, ResponseHandler, void>? interceptResponse,
+    Interceptor<StreamedResponse, ResponseHandler, void>? interceptResponse,
     Interceptor<Object, ErrorHandler, void>? interceptError,
   }) =>
       _HttpInterceptorWrapper(
@@ -45,7 +45,7 @@ class HttpInterceptor {
   void interceptRequest(BaseRequest request, RequestHandler handler) => handler.next(request);
 
   /// Intercepts the response and returns a new response.
-  void interceptResponse(Response response, ResponseHandler handler) => handler.next(response);
+  void interceptResponse(StreamedResponse response, ResponseHandler handler) => handler.next(response);
 
   /// Intercepts the error and returns a new error or response.
   void interceptError(Object error, ErrorHandler handler) => handler.next(error);
@@ -55,7 +55,7 @@ class HttpInterceptor {
     return handler.future;
   }
 
-  Future<InterceptorState> _interceptResponse(Response response, ResponseHandler handler) async {
+  Future<InterceptorState> _interceptResponse(StreamedResponse response, ResponseHandler handler) async {
     interceptResponse(response, handler);
     return handler.future;
   }
@@ -69,14 +69,14 @@ class HttpInterceptor {
 final class _HttpInterceptorWrapper extends HttpInterceptor {
   _HttpInterceptorWrapper({
     Interceptor<BaseRequest, RequestHandler, void>? interceptRequest,
-    Interceptor<Response, ResponseHandler, void>? interceptResponse,
+    Interceptor<StreamedResponse, ResponseHandler, void>? interceptResponse,
     Interceptor<Object, ErrorHandler, void>? interceptError,
   })  : _$interceptRequest = interceptRequest,
         _$interceptResponse = interceptResponse,
         _$interceptError = interceptError;
 
   final Interceptor<BaseRequest, RequestHandler, void>? _$interceptRequest;
-  final Interceptor<Response, ResponseHandler, void>? _$interceptResponse;
+  final Interceptor<StreamedResponse, ResponseHandler, void>? _$interceptResponse;
   final Interceptor<Object, ErrorHandler, void>? _$interceptError;
 
   @override
@@ -89,7 +89,7 @@ final class _HttpInterceptorWrapper extends HttpInterceptor {
   }
 
   @override
-  void interceptResponse(Response response, ResponseHandler handler) {
+  void interceptResponse(StreamedResponse response, ResponseHandler handler) {
     if (_$interceptResponse != null) {
       _$interceptResponse!(response, handler);
     } else {
@@ -188,7 +188,7 @@ class SequentialHttpInterceptor extends HttpInterceptor {
   /// Creates a new [SequentialHttpInterceptor] from the given handlers.
   factory SequentialHttpInterceptor.fromHandlers({
     Interceptor<BaseRequest, RequestHandler, void>? interceptRequest,
-    Interceptor<Response, ResponseHandler, void>? interceptResponse,
+    Interceptor<StreamedResponse, ResponseHandler, void>? interceptResponse,
     Interceptor<Object, ErrorHandler, void>? interceptError,
   }) =>
       _SequentialHttpInterceptorWrapper(
@@ -208,7 +208,7 @@ class SequentialHttpInterceptor extends HttpInterceptor {
 
   /// Method that enqueues the response.
   @override
-  Future<InterceptorState> _interceptResponse(Response response, ResponseHandler handler) =>
+  Future<InterceptorState> _interceptResponse(StreamedResponse response, ResponseHandler handler) =>
       _queuedHandler(_responseQueue, response, handler, interceptResponse);
 
   /// Method that enqueues the error.
@@ -234,14 +234,14 @@ class SequentialHttpInterceptor extends HttpInterceptor {
 final class _SequentialHttpInterceptorWrapper extends SequentialHttpInterceptor {
   _SequentialHttpInterceptorWrapper({
     Interceptor<BaseRequest, RequestHandler, void>? interceptRequest,
-    Interceptor<Response, ResponseHandler, void>? interceptResponse,
+    Interceptor<StreamedResponse, ResponseHandler, void>? interceptResponse,
     Interceptor<Object, ErrorHandler, void>? interceptError,
   })  : _$interceptRequest = interceptRequest,
         _$interceptResponse = interceptResponse,
         _$interceptError = interceptError;
 
   final Interceptor<BaseRequest, RequestHandler, void>? _$interceptRequest;
-  final Interceptor<Response, ResponseHandler, void>? _$interceptResponse;
+  final Interceptor<StreamedResponse, ResponseHandler, void>? _$interceptResponse;
   final Interceptor<Object, ErrorHandler, void>? _$interceptError;
 
   @override
@@ -254,7 +254,7 @@ final class _SequentialHttpInterceptorWrapper extends SequentialHttpInterceptor 
   }
 
   @override
-  void interceptResponse(Response response, ResponseHandler handler) {
+  void interceptResponse(StreamedResponse response, ResponseHandler handler) {
     if (_$interceptResponse != null) {
       _$interceptResponse!(response, handler);
     } else {

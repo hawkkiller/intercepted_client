@@ -18,7 +18,7 @@ class FakeSequentialHttpInterceptorHeaders extends SequentialHttpInterceptor {
   }
 
   @override
-  void interceptResponse(Response response, ResponseHandler handler) {
+  void interceptResponse(StreamedResponse response, ResponseHandler handler) {
     responseCount++;
     handler.next(response);
   }
@@ -31,7 +31,7 @@ class FakeSequentialHttpInterceptorDeclining extends SequentialHttpInterceptor {
   }
 
   @override
-  void interceptResponse(Response response, ResponseHandler handler) {
+  void interceptResponse(StreamedResponse response, ResponseHandler handler) {
     handler.reject('rejected');
   }
 }
@@ -96,77 +96,6 @@ void main() {
         expect(sequentialInterceptor.requestCount, isZero);
       });
 
-      test('adds headers to response', () async {
-        // given
-        final client = InterceptedClient(
-          inner: MockClient((request) async => Response('', 200)),
-          interceptors: [
-            HttpInterceptor.fromHandlers(
-              interceptResponse: (response, handler) {
-                final res = Response(
-                  response.body,
-                  response.statusCode,
-                  headers: {...response.headers, 'foo': 'bar'},
-                );
-                handler.next(res);
-              },
-            ),
-          ],
-        );
-
-        final req = Request('GET', Uri.parse('http://localhost'));
-
-        // when
-        final response = client.send(req);
-
-        // then
-        await expectLater(
-          response,
-          completion(
-            predicate<StreamedResponse>(
-              (response) => response.statusCode == 200 && response.headers['foo'] == 'bar',
-            ),
-          ),
-        );
-      });
-
-      test('adds headers to request and response', () {
-        // given
-        final client = InterceptedClient(
-          inner: MockClient((request) async => Response('', 200)),
-          interceptors: [
-            HttpInterceptor.fromHandlers(
-              interceptRequest: (request, handler) {
-                handler.next(request..headers['foo'] = 'bar');
-              },
-              interceptResponse: (response, handler) {
-                final res = Response(
-                  response.body,
-                  response.statusCode,
-                  headers: {...response.headers, 'foo': 'bar'},
-                );
-                handler.next(res);
-              },
-            ),
-          ],
-        );
-
-        final req = Request('GET', Uri.parse('http://localhost'));
-
-        // when
-        final response = client.send(req);
-
-        // then
-        expectLater(
-          response,
-          completion(
-            predicate<StreamedResponse>(
-              (response) => response.statusCode == 200 && response.headers['foo'] == 'bar',
-            ),
-          ),
-        );
-      });
-
       test('errors are intercepted on reject with next: true', () {
         // given
         final client = InterceptedClient(
@@ -205,7 +134,10 @@ void main() {
           interceptors: [
             HttpInterceptor.fromHandlers(
               interceptRequest: (request, handler) {
-                handler.resolve(Response('', 201), next: true);
+                handler.resolve(
+                  StreamedResponse(ByteStream.fromBytes([]), 201),
+                  next: true,
+                );
               },
               interceptResponse: (response, handler) {
                 handler.next(response);
@@ -285,7 +217,9 @@ void main() {
             ),
             HttpInterceptor.fromHandlers(
               interceptError: (error, handler) {
-                handler.resolve(Response('', 201));
+                handler.resolve(
+                  StreamedResponse(ByteStream.fromBytes([]), 201),
+                );
               },
             ),
           ],

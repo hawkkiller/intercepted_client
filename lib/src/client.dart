@@ -34,7 +34,6 @@ base class InterceptedClient extends BaseClient {
       _requestInterceptorWrapper((request, handler) {
         return _inner
             .send(request)
-            .then(Response.fromStream)
             .then((response) => handler.resolve(response, next: true))
             .then((value) => handler.future);
       }),
@@ -53,8 +52,8 @@ base class InterceptedClient extends BaseClient {
     }
 
     return future.then((res) {
-      final response = res.value as Response;
-      return _convertToStreamed(response);
+      final response = res.value as StreamedResponse;
+      return response;
     }).catchError((Object e, StackTrace stackTrace) {
       final err = e is InterceptorState ? e.value : e;
 
@@ -95,13 +94,13 @@ base class InterceptedClient extends BaseClient {
 
   // Wrapper for response interceptors to return future.
   FutureOr<InterceptorState> Function(InterceptorState) _responseInterceptorWrapper(
-    Interceptor<Response, ResponseHandler, Future<InterceptorState>> interceptor,
+    Interceptor<StreamedResponse, ResponseHandler, Future<InterceptorState>> interceptor,
   ) =>
       (InterceptorState state) async {
         if (state.action == InterceptorAction.next ||
             state.action == InterceptorAction.resolveNext) {
           final handler = ResponseHandler();
-          final res = await interceptor(state.value as Response, handler);
+          final res = await interceptor(state.value as StreamedResponse, handler);
           return res;
         }
 
