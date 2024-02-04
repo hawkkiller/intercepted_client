@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:http/http.dart';
 import 'package:http/testing.dart';
 import 'package:intercepted_client/src/client.dart';
@@ -262,6 +264,42 @@ void main() {
           response,
           completion(
             predicate<Response>((response) => response.statusCode == 201),
+          ),
+        );
+      });
+
+      test('response interceptor resolves json response', () {
+        // given
+        final client = InterceptedClient(
+          inner: MockClient((request) async => Response('{"foo": "bar"}', 200)),
+          interceptors: [
+            HttpInterceptor.fromHandlers(
+              interceptResponse: (response, handler) {
+                expect(response.statusCode, 200);
+
+                handler.resolve(
+                  StreamedResponse(
+                    ByteStream.fromBytes(
+                      utf8.encode('{"foo": "baz"}'),
+                    ),
+                    201,
+                    headers: response.headers,
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+
+        // when
+        final response = client.get(Uri.parse('http://localhost'));
+
+        // then
+        expectLater(
+          response,
+          completion(
+            predicate<Response>(
+                (response) => response.statusCode == 201 && response.body == '{"foo": "baz"}'),
           ),
         );
       });
