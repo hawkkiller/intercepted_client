@@ -14,14 +14,14 @@ enum InterceptorAction {
 }
 
 /// State of interceptor.
-final class InterceptorState {
+base class InterceptorState<T> {
   const InterceptorState({
     required this.value,
     this.action = InterceptorAction.next,
   });
 
   final InterceptorAction action;
-  final Object value;
+  final T value;
 }
 
 /// Interceptor that is used for both requests and responses.
@@ -42,20 +42,33 @@ class HttpInterceptor {
       );
 
   /// Intercepts the request and returns a new request.
-  void interceptRequest(BaseRequest request, RequestHandler handler) => handler.next(request);
+  void interceptRequest(
+    BaseRequest request,
+    RequestHandler handler,
+  ) =>
+      handler.next(request);
 
   /// Intercepts the response and returns a new response.
-  void interceptResponse(StreamedResponse response, ResponseHandler handler) => handler.next(response);
+  void interceptResponse(
+    StreamedResponse response,
+    ResponseHandler handler,
+  ) =>
+      handler.next(response);
 
   /// Intercepts the error and returns a new error or response.
-  void interceptError(Object error, ErrorHandler handler) => handler.next(error);
+  void interceptError(
+    Object error,
+    ErrorHandler handler,
+  ) =>
+      handler.next(error);
 
   Future<InterceptorState> _interceptRequest(BaseRequest request, RequestHandler handler) async {
     interceptRequest(request, handler);
     return handler.future;
   }
 
-  Future<InterceptorState> _interceptResponse(StreamedResponse response, ResponseHandler handler) async {
+  Future<InterceptorState> _interceptResponse(
+      StreamedResponse response, ResponseHandler handler) async {
     interceptResponse(response, handler);
     return handler.future;
   }

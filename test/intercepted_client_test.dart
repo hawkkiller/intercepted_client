@@ -236,6 +236,35 @@ void main() {
           ),
         );
       });
+
+      test('response interceptor resolves response', () {
+        // given
+        final client = InterceptedClient(
+          inner: MockClient((request) async => Response('', 200)),
+          interceptors: [
+            HttpInterceptor.fromHandlers(
+              interceptResponse: (response, handler) {
+                expect(response.statusCode, 200);
+
+                handler.resolve(
+                  StreamedResponse(ByteStream.fromBytes([]), 201),
+                );
+              },
+            ),
+          ],
+        );
+
+        // when
+        final response = client.get(Uri.parse('http://localhost'));
+
+        // then
+        expectLater(
+          response,
+          completion(
+            predicate<Response>((response) => response.statusCode == 201),
+          ),
+        );
+      });
     });
 
     group('SequentialInterceptor', () {
