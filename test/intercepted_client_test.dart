@@ -268,6 +268,40 @@ void main() {
         // then
         expectLater(response, throwsA('rejected'));
       });
+      test('error interceptor resolves response', () {
+        // given
+        final client = InterceptedClient(
+          inner: MockClient((request) async => Response('', 200)),
+          interceptors: [
+            HttpInterceptor.fromHandlers(
+              interceptRequest: (request, handler) {
+                handler.reject('rejected 1', next: true);
+              },
+            ),
+            HttpInterceptor.fromHandlers(
+              interceptError: (error, handler) {
+                handler.next(1);
+              },
+            ),
+            HttpInterceptor.fromHandlers(
+              interceptError: (error, handler) {
+                handler.resolve(Response('', 201));
+              },
+            ),
+          ],
+        );
+
+        // when
+        final response = client.get(Uri.parse('http://localhost'));
+
+        // then
+        expectLater(
+          response,
+          completion(
+            predicate<Response>((response) => response.statusCode == 201),
+          ),
+        );
+      });
     });
 
     group('SequentialInterceptor', () {
@@ -329,41 +363,6 @@ void main() {
 
         expect(stopwatch.elapsedMilliseconds, greaterThanOrEqualTo(200));
       });
-    });
-
-    test('error interceptor resolves response', () {
-      // given
-      final client = InterceptedClient(
-        inner: MockClient((request) async => Response('', 200)),
-        interceptors: [
-          HttpInterceptor.fromHandlers(
-            interceptRequest: (request, handler) {
-              handler.reject('rejected 1', next: true);
-            },
-          ),
-          HttpInterceptor.fromHandlers(
-            interceptError: (error, handler) {
-              handler.next(1);
-            },
-          ),
-          HttpInterceptor.fromHandlers(
-            interceptError: (error, handler) {
-              handler.resolve(Response('', 201));
-            },
-          ),
-        ],
-      );
-
-      // when
-      final response = client.get(Uri.parse('http://localhost'));
-
-      // then
-      expectLater(
-        response,
-        completion(
-          predicate<Response>((response) => response.statusCode == 201),
-        ),
-      );
     });
   });
 }

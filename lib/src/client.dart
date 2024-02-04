@@ -1,5 +1,3 @@
-// ignore_for_file: avoid-unnecessary-reassignment, argument_type_not_assignable_to_error_handler
-
 import 'dart:async';
 
 import 'package:collection/collection.dart';
@@ -28,40 +26,29 @@ base class InterceptedClient extends BaseClient {
 
     for (final interceptor in _interceptors) {
       future = future.then(
-        _requestInterceptorWrapper(
-          interceptor is SequentialHttpInterceptor
-              ? interceptor._interceptRequest
-              : interceptor.interceptRequest,
-        ),
+        _requestInterceptorWrapper(interceptor._interceptRequest),
       );
     }
 
     future = future.then(
       _requestInterceptorWrapper((request, handler) {
-        _inner
+        return _inner
             .send(request)
             .then(Response.fromStream)
-            .then((response) => handler.resolve(response, next: true));
+            .then((response) => handler.resolve(response, next: true))
+            .then((value) => handler.future);
       }),
     );
 
     for (final interceptor in _interceptors) {
       future = future.then(
-        _responseInterceptorWrapper(
-          interceptor is SequentialHttpInterceptor
-              ? interceptor._interceptResponse
-              : interceptor.interceptResponse,
-        ),
+        _responseInterceptorWrapper(interceptor._interceptResponse),
       );
     }
 
     for (final interceptor in _interceptors) {
       future = future.catchError(
-        _errorInterceptorWrapper(
-          interceptor is SequentialHttpInterceptor
-              ? interceptor._interceptError
-              : interceptor.interceptError,
-        ),
+        _errorInterceptorWrapper(interceptor._interceptError),
       );
     }
 
@@ -93,50 +80,46 @@ base class InterceptedClient extends BaseClient {
       );
 
   // Wrapper for request interceptors to return future.
-  FutureOr<InterceptorState> Function(InterceptorState)
-      _requestInterceptorWrapper(
-    Interceptor<BaseRequest, RequestHandler> interceptor,
+  FutureOr<InterceptorState> Function(InterceptorState) _requestInterceptorWrapper(
+    Interceptor<BaseRequest, RequestHandler, Future<InterceptorState>> interceptor,
   ) =>
-          (InterceptorState state) {
-            if (state.action == InterceptorAction.next) {
-              final handler = RequestHandler();
-              interceptor(state.value as BaseRequest, handler);
-              return handler.future;
-            }
+      (InterceptorState state) async {
+        if (state.action == InterceptorAction.next) {
+          final handler = RequestHandler();
+          final result = await interceptor(state.value as BaseRequest, handler);
+          return result;
+        }
 
-            return state;
-          };
+        return state;
+      };
 
   // Wrapper for response interceptors to return future.
-  FutureOr<InterceptorState> Function(InterceptorState)
-      _responseInterceptorWrapper(
-    Interceptor<Response, ResponseHandler> interceptor,
+  FutureOr<InterceptorState> Function(InterceptorState) _responseInterceptorWrapper(
+    Interceptor<Response, ResponseHandler, Future<InterceptorState>> interceptor,
   ) =>
-          (InterceptorState state) {
-            if (state.action == InterceptorAction.next ||
-                state.action == InterceptorAction.resolveNext) {
-              final handler = ResponseHandler();
-              interceptor(state.value as Response, handler);
-              return handler.future;
-            }
+      (InterceptorState state) async {
+        if (state.action == InterceptorAction.next ||
+            state.action == InterceptorAction.resolveNext) {
+          final handler = ResponseHandler();
+          final res = await interceptor(state.value as Response, handler);
+          return res;
+        }
 
-            return state;
-          };
+        return state;
+      };
 
   // Wrapper for error interceptors to return future.
-  FutureOr<InterceptorState> Function(
-      InterceptorState) _errorInterceptorWrapper(
-    Interceptor<Object, ErrorHandler> interceptor,
+  FutureOr<InterceptorState> Function(Object) _errorInterceptorWrapper(
+    Interceptor<Object, ErrorHandler, Future<InterceptorState>> interceptor,
   ) =>
-      (Object error) {
-        final state =
-            error is InterceptorState ? error : InterceptorState(value: error);
+      (Object error) async {
+        final state = error is InterceptorState ? error : InterceptorState(value: error);
 
         if (state.action == InterceptorAction.next ||
             state.action == InterceptorAction.rejectNext) {
           final handler = ErrorHandler();
-          interceptor(state.value, handler);
-          return handler.future;
+          final res = await interceptor(state.value, handler);
+          return res;
         }
 
         throw state;

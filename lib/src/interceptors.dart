@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-typedef Interceptor<T extends Object, H extends Handler> = void Function(
+typedef Interceptor<T extends Object, H extends Handler, R> = R Function(
   T value,
   H handler,
 );
@@ -31,9 +31,9 @@ class HttpInterceptor {
 
   /// Creates a new [HttpInterceptor] from the given handlers.
   factory HttpInterceptor.fromHandlers({
-    Interceptor<BaseRequest, RequestHandler>? interceptRequest,
-    Interceptor<Response, ResponseHandler>? interceptResponse,
-    Interceptor<Object, ErrorHandler>? interceptError,
+    Interceptor<BaseRequest, RequestHandler, void>? interceptRequest,
+    Interceptor<Response, ResponseHandler, void>? interceptResponse,
+    Interceptor<Object, ErrorHandler, void>? interceptError,
   }) =>
       _HttpInterceptorWrapper(
         interceptRequest: interceptRequest,
@@ -49,25 +49,40 @@ class HttpInterceptor {
 
   /// Intercepts the error and returns a new error or response.
   void interceptError(Object error, ErrorHandler handler) => handler.next(error);
+
+  Future<InterceptorState> _interceptRequest(BaseRequest request, RequestHandler handler) async {
+    interceptRequest(request, handler);
+    return handler.future;
+  }
+
+  Future<InterceptorState> _interceptResponse(Response response, ResponseHandler handler) async {
+    interceptResponse(response, handler);
+    return handler.future;
+  }
+
+  Future<InterceptorState> _interceptError(Object error, ErrorHandler handler) async {
+    interceptError(error, handler);
+    return handler.future;
+  }
 }
 
 final class _HttpInterceptorWrapper extends HttpInterceptor {
   _HttpInterceptorWrapper({
-    Interceptor<BaseRequest, RequestHandler>? interceptRequest,
-    Interceptor<Response, ResponseHandler>? interceptResponse,
-    Interceptor<Object, ErrorHandler>? interceptError,
-  })  : _interceptRequest = interceptRequest,
-        _interceptResponse = interceptResponse,
-        _interceptError = interceptError;
+    Interceptor<BaseRequest, RequestHandler, void>? interceptRequest,
+    Interceptor<Response, ResponseHandler, void>? interceptResponse,
+    Interceptor<Object, ErrorHandler, void>? interceptError,
+  })  : _$interceptRequest = interceptRequest,
+        _$interceptResponse = interceptResponse,
+        _$interceptError = interceptError;
 
-  final Interceptor<BaseRequest, RequestHandler>? _interceptRequest;
-  final Interceptor<Response, ResponseHandler>? _interceptResponse;
-  final Interceptor<Object, ErrorHandler>? _interceptError;
+  final Interceptor<BaseRequest, RequestHandler, void>? _$interceptRequest;
+  final Interceptor<Response, ResponseHandler, void>? _$interceptResponse;
+  final Interceptor<Object, ErrorHandler, void>? _$interceptError;
 
   @override
   void interceptRequest(BaseRequest request, RequestHandler handler) {
-    if (_interceptRequest != null) {
-      _interceptRequest!(request, handler);
+    if (_$interceptRequest != null) {
+      _$interceptRequest!(request, handler);
     } else {
       handler.next(request);
     }
@@ -75,8 +90,8 @@ final class _HttpInterceptorWrapper extends HttpInterceptor {
 
   @override
   void interceptResponse(Response response, ResponseHandler handler) {
-    if (_interceptResponse != null) {
-      _interceptResponse!(response, handler);
+    if (_$interceptResponse != null) {
+      _$interceptResponse!(response, handler);
     } else {
       handler.next(response);
     }
@@ -84,29 +99,80 @@ final class _HttpInterceptorWrapper extends HttpInterceptor {
 
   @override
   void interceptError(Object error, ErrorHandler handler) {
-    if (_interceptError != null) {
-      _interceptError!(error, handler);
+    if (_$interceptError != null) {
+      _$interceptError!(error, handler);
     } else {
       handler.next(error);
     }
   }
 }
 
-typedef _Task = FutureOr<dynamic> Function();
+final class _Task<T extends Object, H extends Handler> {
+  _Task({
+    required Interceptor<T, H, void> interceptor,
+    required this.value,
+    required H handler,
+  })  : _interceptor = interceptor,
+        _handler = handler;
+
+  final Interceptor<T, H, void> _interceptor;
+  T value;
+  final H _handler;
+
+  final _completer = Completer<InterceptorState>();
+
+  Future<InterceptorState> call() async {
+    _interceptor(value, _handler);
+    final result = await _handler.future;
+
+    if (!_completer.isCompleted) {
+      _completer.complete(result);
+    }
+
+    return result;
+  }
+
+  void reject(Object error, StackTrace stackTrace) {
+    _completer.completeError(
+      InterceptorState(value: error, action: InterceptorAction.next),
+      stackTrace,
+    );
+  }
+
+  Future<InterceptorState> get future => _completer.future;
+}
 
 final class _TaskQueue extends QueueList<_Task> {
+  _TaskQueue() : super(5);
+
   bool get isProcessing => length > 0;
+  bool _closed = false;
+
   Future<void>? _processing;
 
   @override
-  void add(_Task element) {
+  Future<InterceptorState> add(_Task element) async {
     super.add(element);
     _run();
+    return element.future;
+  }
+
+  Future<void> close() async {
+    await _processing;
+    _closed = true;
   }
 
   void _run() => _processing ??= Future(() async {
         while (isProcessing) {
-          await removeFirst()();
+          final elem = first;
+          if (_closed) return;
+          try {
+            await elem();
+          } on Object catch (e, stackTrace) {
+            elem.reject(e, stackTrace);
+          } finally {
+            removeFirst();
+          }
         }
         _processing = null;
       });
@@ -121,9 +187,9 @@ class SequentialHttpInterceptor extends HttpInterceptor {
 
   /// Creates a new [SequentialHttpInterceptor] from the given handlers.
   factory SequentialHttpInterceptor.fromHandlers({
-    Interceptor<BaseRequest, RequestHandler>? interceptRequest,
-    Interceptor<Response, ResponseHandler>? interceptResponse,
-    Interceptor<Object, ErrorHandler>? interceptError,
+    Interceptor<BaseRequest, RequestHandler, void>? interceptRequest,
+    Interceptor<Response, ResponseHandler, void>? interceptResponse,
+    Interceptor<Object, ErrorHandler, void>? interceptError,
   }) =>
       _SequentialHttpInterceptorWrapper(
         interceptRequest: interceptRequest,
@@ -136,47 +202,47 @@ class SequentialHttpInterceptor extends HttpInterceptor {
   final _errorQueue = _TaskQueue();
 
   /// Method that enqueues the request.
-  void _interceptRequest(BaseRequest request, RequestHandler handler) =>
+  @override
+  Future<InterceptorState> _interceptRequest(BaseRequest request, RequestHandler handler) =>
       _queuedHandler(_requestQueue, request, handler, interceptRequest);
 
   /// Method that enqueues the response.
-  void _interceptResponse(Response response, ResponseHandler handler) =>
+  @override
+  Future<InterceptorState> _interceptResponse(Response response, ResponseHandler handler) =>
       _queuedHandler(_responseQueue, response, handler, interceptResponse);
 
   /// Method that enqueues the error.
-  void _interceptError(Object error, ErrorHandler handler) => _queuedHandler(
+  @override
+  Future<InterceptorState> _interceptError(Object error, ErrorHandler handler) => _queuedHandler(
         _errorQueue,
         error,
         handler,
         interceptError,
       );
 
-  void _queuedHandler<T extends Object, H extends Handler>(
+  Future<InterceptorState> _queuedHandler<T extends Object, H extends Handler>(
     _TaskQueue taskQueue,
     T value,
     H handler,
-    Interceptor<T, H> interceptor,
-  ) =>
-      taskQueue.add(
-        () async {
-          interceptor(value, handler);
-          return handler.future;
-        },
-      );
+    Interceptor<T, H, void> interceptor,
+  ) {
+    final task = _Task(interceptor: interceptor, value: value, handler: handler);
+    return taskQueue.add(task);
+  }
 }
 
 final class _SequentialHttpInterceptorWrapper extends SequentialHttpInterceptor {
   _SequentialHttpInterceptorWrapper({
-    Interceptor<BaseRequest, RequestHandler>? interceptRequest,
-    Interceptor<Response, ResponseHandler>? interceptResponse,
-    Interceptor<Object, ErrorHandler>? interceptError,
+    Interceptor<BaseRequest, RequestHandler, void>? interceptRequest,
+    Interceptor<Response, ResponseHandler, void>? interceptResponse,
+    Interceptor<Object, ErrorHandler, void>? interceptError,
   })  : _$interceptRequest = interceptRequest,
         _$interceptResponse = interceptResponse,
         _$interceptError = interceptError;
 
-  final Interceptor<BaseRequest, RequestHandler>? _$interceptRequest;
-  final Interceptor<Response, ResponseHandler>? _$interceptResponse;
-  final Interceptor<Object, ErrorHandler>? _$interceptError;
+  final Interceptor<BaseRequest, RequestHandler, void>? _$interceptRequest;
+  final Interceptor<Response, ResponseHandler, void>? _$interceptResponse;
+  final Interceptor<Object, ErrorHandler, void>? _$interceptError;
 
   @override
   void interceptRequest(BaseRequest request, RequestHandler handler) {
