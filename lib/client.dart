@@ -6,4 +6,7 @@ export 'src/client.dart'
         InterceptorAction,
         HttpInterceptor,
         Interceptor,
-        SequentialHttpInterceptor;
+        SequentialHttpInterceptor,
+        RequestHandler,
+        ResponseHandler,
+        ErrorHandler;

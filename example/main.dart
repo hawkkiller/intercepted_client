@@ -1,5 +1,5 @@
 import 'package:http/http.dart';
-import 'package:intercepted_client/intercepted_client.dart';
+import 'package:intercepted_client/client.dart';
 
 class AuthInterceptor extends SequentialHttpInterceptor {
   final String token;
