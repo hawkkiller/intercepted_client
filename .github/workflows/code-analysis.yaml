@@ -1,0 +1,40 @@
+name: "Code Analysis"
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: 
+      image: dart:stable
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v3
+      
+      - name: 📦 Get Dependencies
+        run: |
+          dart pub get --no-example
+          dart pub global activate coverage
+
+      - name: 📝 Run Analysis
+        run: dart analyze
+      
+      - name: 🧪 Run Tests
+        run: dart pub global run coverage:test_with_coverage
+
+      - name: 📈 Upload Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          # not needed for public repos
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage/lcov.info
+          name: codecov-umbrella
+          fail_ci_if_error: true

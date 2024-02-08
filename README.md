@@ -1,5 +1,4 @@
-Points to consider:
+# Intercepted Client
 
-- streamed responses (aka chatgpt)
-- converting between streamed and response types
-- is conformance to the http.Client is required?
+This is a simple HTTP client that supports interceptors and concurrent requests. It is built on top of the `http` package and implements the `Client` interface.
+
