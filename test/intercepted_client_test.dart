@@ -110,12 +110,12 @@ void main() {
             ),
             HttpInterceptor.fromHandlers(
               interceptError: (error, handler) {
-                handler.next(1);
+                handler.reject(1, next: true);
               },
             ),
             HttpInterceptor.fromHandlers(
               interceptError: (error, handler) {
-                handler.next(2);
+                handler.reject(2, next: true);
               },
             ),
           ],
@@ -214,7 +214,7 @@ void main() {
             ),
             HttpInterceptor.fromHandlers(
               interceptError: (error, handler) {
-                handler.next(1);
+                handler.reject(1, next: true);
               },
             ),
             HttpInterceptor.fromHandlers(

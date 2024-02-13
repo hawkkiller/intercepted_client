@@ -10,9 +10,9 @@ part 'interceptors.dart';
 base class InterceptedClient extends BaseClient {
   /// Creates a new [InterceptedClient].
   InterceptedClient({
-    required Client inner,
+    Client? inner,
     List<HttpInterceptor>? interceptors,
-  })  : _inner = inner,
+  })  : _inner = inner ?? Client(),
         _interceptors = interceptors ?? const [];
 
   final Client _inner;
@@ -20,7 +20,7 @@ base class InterceptedClient extends BaseClient {
 
   @override
   Future<StreamedResponse> send(BaseRequest request) {
-    Future<InterceptorState> future = Future.sync(
+    Future<InterceptorState<Object?>> future = Future.sync(
       () => InterceptorState(value: request),
     );
 
@@ -58,7 +58,8 @@ base class InterceptedClient extends BaseClient {
       final err = e is InterceptorState ? e.value : e;
 
       if (e is InterceptorState) {
-        if (e.action == InterceptorAction.resolve) {
+        if (e.action == InterceptorAction.resolve ||
+            e.action == InterceptorAction.resolveAllowNext) {
           return _convertToStreamed(err as Response);
         }
       }
@@ -98,7 +99,7 @@ base class InterceptedClient extends BaseClient {
   ) =>
       (InterceptorState state) async {
         if (state.action == InterceptorAction.next ||
-            state.action == InterceptorAction.resolveNext) {
+            state.action == InterceptorAction.resolveAllowNext) {
           final handler = ResponseHandler();
           final res = await interceptor(state.value as StreamedResponse, handler);
           return res;
@@ -108,19 +109,23 @@ base class InterceptedClient extends BaseClient {
       };
 
   // Wrapper for error interceptors to return future.
-  FutureOr<InterceptorState> Function(Object) _errorInterceptorWrapper(
+  FutureOr<InterceptorState> Function(Object, StackTrace) _errorInterceptorWrapper(
     Interceptor<Object, ErrorHandler, Future<InterceptorState>> interceptor,
   ) =>
-      (Object error) async {
-        final state = error is InterceptorState ? error : InterceptorState(value: error);
+      (Object error, StackTrace stackTrace) async {
+        final state = error is InterceptorState
+            ? error
+            : InterceptorState(
+                value: error,
+                action: InterceptorAction.rejectAllowNext,
+              );
 
-        if (state.action == InterceptorAction.next ||
-            state.action == InterceptorAction.rejectNext) {
+        if (state.action == InterceptorAction.rejectAllowNext) {
           final handler = ErrorHandler();
           final res = await interceptor(state.value, handler);
           return res;
         }
 
-        throw state;
+        Error.throwWithStackTrace(error, stackTrace);
       };
 }

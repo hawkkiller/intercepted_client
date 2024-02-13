@@ -8,9 +8,9 @@ typedef Interceptor<T extends Object, H extends Handler, R> = R Function(
 enum InterceptorAction {
   next,
   reject,
-  rejectNext,
+  rejectAllowNext,
   resolve,
-  resolveNext,
+  resolveAllowNext,
 }
 
 /// State of interceptor.
@@ -60,7 +60,7 @@ class HttpInterceptor {
     Object error,
     ErrorHandler handler,
   ) =>
-      handler.next(error);
+      handler.reject(error, next: true);
 
   Future<InterceptorState> _interceptRequest(BaseRequest request, RequestHandler handler) async {
     interceptRequest(request, handler);
@@ -115,7 +115,7 @@ final class _HttpInterceptorWrapper extends HttpInterceptor {
     if (_$interceptError != null) {
       _$interceptError!(error, handler);
     } else {
-      handler.next(error);
+      handler.reject(error, next: true);
     }
   }
 }
@@ -280,7 +280,7 @@ final class _SequentialHttpInterceptorWrapper extends SequentialHttpInterceptor 
     if (_$interceptError != null) {
       _$interceptError!(error, handler);
     } else {
-      handler.next(error);
+      handler.reject(error, next: true);
     }
   }
 }

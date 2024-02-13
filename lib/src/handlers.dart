@@ -20,14 +20,17 @@ final class RequestHandler extends Handler {
     _completer.completeError(
       InterceptorState(
         value: error,
-        action: next ? InterceptorAction.next : InterceptorAction.reject,
+        action: next ? InterceptorAction.rejectAllowNext : InterceptorAction.reject,
       ),
+      StackTrace.current,
     );
   }
 
   /// Goes to the next interceptor.
   void next(BaseRequest request) {
-    _completer.complete(InterceptorState(value: request));
+    _completer.complete(
+      InterceptorState(value: request),
+    );
   }
 
   /// Resolves the request.
@@ -35,7 +38,7 @@ final class RequestHandler extends Handler {
     _completer.complete(
       InterceptorState(
         value: response,
-        action: next ? InterceptorAction.resolveNext : InterceptorAction.resolve,
+        action: next ? InterceptorAction.resolveAllowNext : InterceptorAction.resolve,
       ),
     );
   }
@@ -51,8 +54,9 @@ final class ResponseHandler extends Handler {
     _completer.completeError(
       InterceptorState(
         value: error,
-        action: next ? InterceptorAction.rejectNext : InterceptorAction.reject,
+        action: next ? InterceptorAction.rejectAllowNext : InterceptorAction.reject,
       ),
+      StackTrace.current,
     );
   }
 
@@ -61,7 +65,7 @@ final class ResponseHandler extends Handler {
     _completer.complete(
       InterceptorState(
         value: response,
-        action: next ? InterceptorAction.resolveNext : InterceptorAction.resolve,
+        action: next ? InterceptorAction.resolveAllowNext : InterceptorAction.resolve,
       ),
     );
   }
@@ -82,8 +86,9 @@ final class ErrorHandler extends Handler {
     _completer.completeError(
       InterceptorState(
         value: error,
-        action: next ? InterceptorAction.rejectNext : InterceptorAction.reject,
+        action: next ? InterceptorAction.rejectAllowNext : InterceptorAction.reject,
       ),
+      StackTrace.current,
     );
   }
 
@@ -92,10 +97,5 @@ final class ErrorHandler extends Handler {
     _completer.complete(
       InterceptorState(value: response, action: InterceptorAction.resolve),
     );
-  }
-
-  /// Goes to the next interceptor.
-  void next(Object error, [StackTrace? stackTrace]) {
-    _completer.completeError(InterceptorState(value: error), stackTrace);
   }
 }
