@@ -62,18 +62,26 @@ class HttpInterceptor {
   ) =>
       handler.reject(error, next: true);
 
-  Future<InterceptorState> _interceptRequest(BaseRequest request, RequestHandler handler) async {
+  Future<InterceptorState> _interceptRequest(
+    BaseRequest request,
+    RequestHandler handler,
+  ) async {
     interceptRequest(request, handler);
     return handler.future;
   }
 
   Future<InterceptorState> _interceptResponse(
-      StreamedResponse response, ResponseHandler handler) async {
+    StreamedResponse response,
+    ResponseHandler handler,
+  ) async {
     interceptResponse(response, handler);
     return handler.future;
   }
 
-  Future<InterceptorState> _interceptError(Object error, ErrorHandler handler) async {
+  Future<InterceptorState> _interceptError(
+    Object error,
+    ErrorHandler handler,
+  ) async {
     interceptError(error, handler);
     return handler.future;
   }
