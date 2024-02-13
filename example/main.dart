@@ -1,5 +1,5 @@
 import 'package:http/http.dart';
-import 'package:intercepted_client/client.dart';
+import 'package:intercepted_client/intercepted_client.dart';
 
 Future<void> main() async {
   final client = InterceptedClient(
