@@ -4,8 +4,8 @@ export 'src/client.dart'
     show
         InterceptedClient,
         InterceptorAction,
-        HttpInterceptor,
         Interceptor,
+        HttpInterceptor,
         SequentialHttpInterceptor,
         RequestHandler,
         ResponseHandler,
