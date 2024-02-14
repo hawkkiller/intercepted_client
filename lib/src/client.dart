@@ -60,24 +60,13 @@ base class InterceptedClient extends BaseClient {
       if (e is InterceptorState) {
         if (e.action == InterceptorAction.resolve ||
             e.action == InterceptorAction.resolveAllowNext) {
-          return _convertToStreamed(err as Response);
+          return err as StreamedResponse;
         }
       }
 
       Error.throwWithStackTrace(err, stackTrace);
     });
   }
-
-  StreamedResponse _convertToStreamed(Response response) => StreamedResponse(
-        ByteStream.fromBytes(response.bodyBytes),
-        response.statusCode,
-        contentLength: response.contentLength,
-        headers: response.headers,
-        isRedirect: response.isRedirect,
-        persistentConnection: response.persistentConnection,
-        reasonPhrase: response.reasonPhrase,
-        request: response.request,
-      );
 
   // Wrapper for request interceptors to return future.
   FutureOr<InterceptorState> Function(InterceptorState) _requestInterceptorWrapper(
