@@ -22,19 +22,19 @@ class FakeSequentialHttpInterceptorHeaders extends SequentialHttpInterceptor {
   @override
   void interceptResponse(StreamedResponse response, ResponseHandler handler) {
     responseCount++;
-    handler.next(response);
+    handler.resolveResponse(response);
   }
 }
 
 class FakeSequentialHttpInterceptorDeclining extends SequentialHttpInterceptor {
   @override
   void interceptRequest(BaseRequest request, RequestHandler handler) {
-    handler.reject('rejected');
+    handler.rejectRequest('rejected');
   }
 
   @override
   void interceptResponse(StreamedResponse response, ResponseHandler handler) {
-    handler.reject('rejected');
+    handler.rejectResponse('rejected');
   }
 }
 
@@ -81,7 +81,7 @@ void main() {
           interceptors: [
             HttpInterceptor.fromHandlers(
               interceptRequest: (request, handler) {
-                handler.reject('rejected 1');
+                handler.rejectRequest('rejected 1');
               },
             ),
             sequentialInterceptor,
@@ -105,17 +105,17 @@ void main() {
           interceptors: [
             HttpInterceptor.fromHandlers(
               interceptRequest: (request, handler) {
-                handler.reject('rejected 1', next: true);
+                handler.rejectRequest('rejected 1', next: true);
               },
             ),
             HttpInterceptor.fromHandlers(
               interceptError: (error, handler) {
-                handler.reject(1, next: true);
+                handler.rejectError(1, next: true);
               },
             ),
             HttpInterceptor.fromHandlers(
               interceptError: (error, handler) {
-                handler.reject(2, next: true);
+                handler.rejectError(2, next: true);
               },
             ),
           ],
@@ -136,13 +136,13 @@ void main() {
           interceptors: [
             HttpInterceptor.fromHandlers(
               interceptRequest: (request, handler) {
-                handler.resolve(
+                handler.resolveResponse(
                   StreamedResponse(ByteStream.fromBytes([]), 201),
                   next: true,
                 );
               },
               interceptResponse: (response, handler) {
-                handler.next(response);
+                handler.resolveResponse(response);
               },
             ),
           ],
@@ -167,10 +167,10 @@ void main() {
           interceptors: [
             HttpInterceptor.fromHandlers(
               interceptRequest: (request, handler) {
-                handler.reject('rejected', next: true);
+                handler.rejectRequest('rejected', next: true);
               },
               interceptResponse: (response, handler) {
-                handler.next(response);
+                handler.resolveResponse(response);
               },
             ),
           ],
@@ -190,7 +190,7 @@ void main() {
           interceptors: [
             HttpInterceptor.fromHandlers(
               interceptResponse: (response, handler) {
-                handler.reject('rejected', next: true);
+                handler.rejectResponse('rejected', next: true);
               },
             ),
           ],
@@ -209,17 +209,17 @@ void main() {
           interceptors: [
             HttpInterceptor.fromHandlers(
               interceptRequest: (request, handler) {
-                handler.reject('rejected 1', next: true);
+                handler.rejectRequest('rejected 1', next: true);
               },
             ),
             HttpInterceptor.fromHandlers(
               interceptError: (error, handler) {
-                handler.reject(1, next: true);
+                handler.rejectError(1, next: true);
               },
             ),
             HttpInterceptor.fromHandlers(
               interceptError: (error, handler) {
-                handler.resolve(
+                handler.resolveResponse(
                   StreamedResponse(ByteStream.fromBytes([]), 201),
                 );
               },
@@ -248,7 +248,7 @@ void main() {
               interceptResponse: (response, handler) {
                 expect(response.statusCode, 200);
 
-                handler.resolve(
+                handler.resolveResponse(
                   StreamedResponse(ByteStream.fromBytes([]), 201),
                 );
               },
@@ -277,7 +277,7 @@ void main() {
               interceptResponse: (response, handler) {
                 expect(response.statusCode, 200);
 
-                handler.resolve(
+                handler.resolveResponse(
                   StreamedResponse(
                     ByteStream.fromBytes(
                       utf8.encode('{"foo": "baz"}'),

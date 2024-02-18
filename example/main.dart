@@ -8,11 +8,11 @@ Future<void> main() async {
       HttpInterceptor.fromHandlers(
         interceptRequest: (value, handler) {
           print('Request: $value');
-          handler.reject(value, next: true);
+          handler.rejectRequest(value, next: true);
         },
         interceptError: (value, handler) {
           print('Error: $value');
-          handler.reject('Hello World', next: true);
+          handler.rejectError('Hello World', next: true);
         },
       ),
     ],

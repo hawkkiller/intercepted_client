@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:collection/collection.dart';
 import 'package:http/http.dart';
+import 'package:stack_trace/stack_trace.dart';
 
 part 'handlers.dart';
 part 'interceptors.dart';
@@ -19,102 +20,67 @@ base class InterceptedClient extends BaseClient {
   final List<HttpInterceptor> _interceptors;
 
   @override
-  Future<StreamedResponse> send(BaseRequest request) {
-    Future<InterceptorState<Object?>> future = Future.sync(
-      () => InterceptorState(value: request),
-    );
+  Future<StreamedResponse> send(BaseRequest request) async {
+    var state = InterceptorState(request: request);
 
-    for (final interceptor in _interceptors) {
-      future = future.then(
-        _requestInterceptorWrapper(interceptor._interceptRequest),
-      );
-    }
+    try {
+      // Iterate through request interceptors.
+      for (final interceptor in _interceptors) {
+        final requestHandler = RequestHandler(state);
+        state = await interceptor._interceptRequest(state.request!, requestHandler);
+      }
 
-    future = future.then(
-      _requestInterceptorWrapper((request, handler) {
-        return _inner
-            .send(request)
-            .then((response) => handler.resolve(response, next: true))
-            .then((value) => handler.future);
-      }),
-    );
+      // If the request is not resolved, send it.
+      if (!state.action.resolved) {
+        final response = await _inner.send(state.request!).onError(
+              (error, stackTrace) => Error.throwWithStackTrace(
+                InterceptorState(request: state.request, error: error),
+                stackTrace,
+              ),
+            );
 
-    for (final interceptor in _interceptors) {
-      future = future.then(
-        _responseInterceptorWrapper(interceptor._interceptResponse),
-      );
-    }
+        state = InterceptorState(request: state.request, response: response);
+      }
 
-    for (final interceptor in _interceptors) {
-      future = future.catchError(
-        _errorInterceptorWrapper(interceptor._interceptError),
-      );
-    }
+      for (final interceptor in _interceptors) {
+        if (state.action == InterceptorAction.reject) {
+          break;
+        }
 
-    return future.then((res) {
-      final response = res.value as StreamedResponse;
-      return response;
-    }).catchError((Object e, StackTrace stackTrace) {
-      final err = e is InterceptorState ? e.value : e;
+        final responseHandler = ResponseHandler(state);
+        state = await interceptor._interceptResponse(state.response!, responseHandler);
+      }
 
-      if (e is InterceptorState) {
-        if (e.action == InterceptorAction.resolve ||
-            e.action == InterceptorAction.resolveAllowNext) {
-          return err as StreamedResponse;
+      return state.response!;
+    } on Object catch (error, stack) {
+      if (error is InterceptorState) {
+        state = error;
+      } else {
+        state = state.copyWith(error: error);
+      }
+
+      // Iterate through error interceptors.
+      for (final interceptor in _interceptors) {
+        if (!state.action.canGoNext) {
+          break;
+        }
+
+        try {
+          final errorHandler = ErrorHandler(state);
+          state = await interceptor._interceptError(state.error!, errorHandler);
+        } catch (e) {
+          state = e is InterceptorState ? e : state.copyWith(error: e);
         }
       }
 
-      Error.throwWithStackTrace(err, stackTrace);
-    });
+      if (state.action.resolved) {
+        return state.response!;
+      }
+
+      return Error.throwWithStackTrace(
+        state.error!,
+        Trace.from(stack).terse,
+      );
+    }
   }
-
-  // Wrapper for request interceptors to return future.
-  FutureOr<InterceptorState> Function(InterceptorState) _requestInterceptorWrapper(
-    Interceptor<BaseRequest, RequestHandler, Future<InterceptorState>> interceptor,
-  ) =>
-      (InterceptorState state) async {
-        if (state.action == InterceptorAction.next) {
-          final handler = RequestHandler();
-          final result = await interceptor(state.value as BaseRequest, handler);
-          return result;
-        }
-
-        return state;
-      };
-
-  // Wrapper for response interceptors to return future.
-  FutureOr<InterceptorState> Function(InterceptorState) _responseInterceptorWrapper(
-    Interceptor<StreamedResponse, ResponseHandler, Future<InterceptorState>> interceptor,
-  ) =>
-      (InterceptorState state) async {
-        if (state.action == InterceptorAction.next ||
-            state.action == InterceptorAction.resolveAllowNext) {
-          final handler = ResponseHandler();
-          final res = await interceptor(state.value as StreamedResponse, handler);
-          return res;
-        }
-
-        return state;
-      };
-
-  // Wrapper for error interceptors to return future.
-  FutureOr<InterceptorState> Function(Object, StackTrace) _errorInterceptorWrapper(
-    Interceptor<Object, ErrorHandler, Future<InterceptorState>> interceptor,
-  ) =>
-      (Object error, StackTrace stackTrace) async {
-        final state = error is InterceptorState
-            ? error
-            : InterceptorState(
-                value: error,
-                action: InterceptorAction.rejectAllowNext,
-              );
-
-        if (state.action == InterceptorAction.rejectAllowNext) {
-          final handler = ErrorHandler();
-          final res = await interceptor(state.value, handler);
-          return res;
-        }
-
-        Error.throwWithStackTrace(error, stackTrace);
-      };
 }

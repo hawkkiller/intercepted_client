@@ -6,22 +6,54 @@ typedef Interceptor<T extends Object, H extends Handler, R> = R Function(
 );
 
 enum InterceptorAction {
+  /// Proceed to next interceptor in chain
   next,
+
+  /// Reject, stop interceptors, rethrow error
   reject,
+
+  /// Reject, but allow rest of chain to handle error
   rejectAllowNext,
+
+  /// Resolve, terminate chain, return response
   resolve,
-  resolveAllowNext,
+
+  /// Resolve, let chain continue for more processing
+  resolveAllowNext;
+
+  /// Returns `true` if the action is resolved.
+  bool get resolved => this == resolve || this == resolveAllowNext;
+
+  /// Returns `true` if the action can go to the next interceptor.
+  bool get canGoNext => this == next || this == resolveAllowNext || this == rejectAllowNext;
 }
 
 /// State of interceptor.
-base class InterceptorState<T> {
-  const InterceptorState({
-    required this.value,
+base class InterceptorState {
+  InterceptorState({
+    required this.request,
     this.action = InterceptorAction.next,
+    this.response,
+    this.error,
   });
 
   final InterceptorAction action;
-  final T value;
+  final BaseRequest? request;
+  final StreamedResponse? response;
+  final Object? error;
+
+  InterceptorState copyWith({
+    BaseRequest? request,
+    StreamedResponse? response,
+    Object? error,
+    InterceptorAction? action,
+  }) =>
+      InterceptorState(
+        request: request ?? this.request,
+        response: response ?? this.response,
+        error: error ?? this.error,
+        action: action ?? this.action,
+      );
 }
 
 /// Interceptor that is used for both requests and responses.
@@ -53,37 +85,37 @@ class HttpInterceptor {
     StreamedResponse response,
     ResponseHandler handler,
   ) =>
-      handler.next(response);
+      handler.resolveResponse(response);
 
   /// Intercepts the error and returns a new error or response.
   void interceptError(
     Object error,
     ErrorHandler handler,
   ) =>
-      handler.reject(error, next: true);
+      handler.rejectError(error, next: true);
 
   Future<InterceptorState> _interceptRequest(
     BaseRequest request,
     RequestHandler handler,
-  ) async {
+  ) {
     interceptRequest(request, handler);
-    return handler.future;
+    return handler._future;
   }
 
   Future<InterceptorState> _interceptResponse(
     StreamedResponse response,
     ResponseHandler handler,
-  ) async {
+  ) {
     interceptResponse(response, handler);
-    return handler.future;
+    return handler._future;
   }
 
   Future<InterceptorState> _interceptError(
     Object error,
     ErrorHandler handler,
-  ) async {
+  ) {
     interceptError(error, handler);
-    return handler.future;
+    return handler._future;
   }
 }
 
@@ -114,7 +146,7 @@ final class _HttpInterceptorWrapper extends HttpInterceptor {
     if (_$interceptResponse != null) {
       _$interceptResponse!(response, handler);
     } else {
-      handler.next(response);
+      handler.resolveResponse(response);
     }
   }
 
@@ -123,7 +155,7 @@ final class _HttpInterceptorWrapper extends HttpInterceptor {
     if (_$interceptError != null) {
       _$interceptError!(error, handler);
     } else {
-      handler.reject(error, next: true);
+      handler.rejectError(error, next: true);
     }
   }
 }
@@ -137,65 +169,59 @@ final class _Task<T extends Object, H extends Handler> {
         _handler = handler;
 
   final Interceptor<T, H, void> _interceptor;
-  T value;
+  final T value;
   final H _handler;
 
-  final _completer = Completer<InterceptorState>();
-
-  Future<InterceptorState> call() async {
+  Future<InterceptorState> call() {
     _interceptor(value, _handler);
-    final result = await _handler.future;
 
-    if (!_completer.isCompleted) {
-      _completer.complete(result);
-    }
-
-    return result;
+    return _handler._future;
   }
 
-  void reject(Object error, StackTrace stackTrace) {
-    _completer.completeError(
-      InterceptorState(value: error, action: InterceptorAction.next),
-      stackTrace,
-    );
-  }
-
-  Future<InterceptorState> get future => _completer.future;
+  /// Returns the future of the handler.
+  Future<InterceptorState> get future => _handler._future;
 }
 
 final class _TaskQueue extends QueueList<_Task> {
   _TaskQueue() : super(5);
 
+  /// Returns `true` if the queue is processing.
   bool get isProcessing => length > 0;
-  bool _closed = false;
 
+  bool _closed = false;
   Future<void>? _processing;
 
   @override
   Future<InterceptorState> add(_Task element) async {
     super.add(element);
     _run();
+
     return element.future;
   }
 
+  /// Closes the queue.
   Future<void> close() async {
     await _processing;
     _closed = true;
   }
 
-  void _run() => _processing ??= Future(() async {
-        while (isProcessing) {
-          final elem = first;
-          if (_closed) return;
-          try {
-            await elem();
-          } on Object catch (e, stackTrace) {
-            elem.reject(e, stackTrace);
-          } finally {
-            removeFirst();
-          }
+  /// Runs the queue.
+  void _run() => _processing ??= Future.doWhile(() async {
+        final elem = first;
+        if (_closed) return false;
+        try {
+          await elem();
+        } on Object {
+          // this error can be ignored, because it is handled by the handler
+        } finally {
+          removeFirst();
         }
-        _processing = null;
+
+        if (isEmpty) {
+          _processing = null;
+        }
+
+        return isNotEmpty;
       });
 }
 
@@ -222,24 +248,26 @@ class SequentialHttpInterceptor extends HttpInterceptor {
   final _responseQueue = _TaskQueue();
   final _errorQueue = _TaskQueue();
 
-  /// Method that enqueues the request.
   @override
-  Future<InterceptorState> _interceptRequest(BaseRequest request, RequestHandler handler) =>
+  Future<InterceptorState> _interceptRequest(
+    BaseRequest request,
+    RequestHandler handler,
+  ) =>
       _queuedHandler(_requestQueue, request, handler, interceptRequest);
 
-  /// Method that enqueues the response.
   @override
-  Future<InterceptorState> _interceptResponse(StreamedResponse response, ResponseHandler handler) =>
+  Future<InterceptorState> _interceptResponse(
+    StreamedResponse response,
+    ResponseHandler handler,
+  ) =>
       _queuedHandler(_responseQueue, response, handler, interceptResponse);
 
-  /// Method that enqueues the error.
   @override
-  Future<InterceptorState> _interceptError(Object error, ErrorHandler handler) => _queuedHandler(
-        _errorQueue,
-        error,
-        handler,
-        interceptError,
-      );
+  Future<InterceptorState> _interceptError(
+    Object error,
+    ErrorHandler handler,
+  ) =>
+      _queuedHandler(_errorQueue, error, handler, interceptError);
 
   Future<InterceptorState> _queuedHandler<T extends Object, H extends Handler>(
     _TaskQueue taskQueue,
@@ -279,7 +307,7 @@ final class _SequentialHttpInterceptorWrapper extends SequentialHttpInterceptor 
     if (_$interceptResponse != null) {
       _$interceptResponse!(response, handler);
     } else {
-      handler.next(response);
+      handler.resolveResponse(response);
     }
   }
 
@@ -288,7 +316,7 @@ final class _SequentialHttpInterceptorWrapper extends SequentialHttpInterceptor 
     if (_$interceptError != null) {
       _$interceptError!(error, handler);
     } else {
-      handler.reject(error, next: true);
+      handler.rejectError(error);
     }
   }
 }
