@@ -1,6 +1,6 @@
 name: intercepted_client
 description: Interceptors for http package that support concurrent requests.
-version: 0.0.1-dev.3
+version: 0.0.1-dev.4
 repository: https://github.com/hawkkiller/intercepted_client
 
 environment:

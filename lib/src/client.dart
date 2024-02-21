@@ -26,6 +26,10 @@ base class InterceptedClient extends BaseClient {
     try {
       // Iterate through request interceptors.
       for (final interceptor in _interceptors) {
+        if (state.action.resolved) {
+          break;
+        }
+
         final requestHandler = RequestHandler(state);
         state = await interceptor._interceptRequest(state.request!, requestHandler);
       }
@@ -43,7 +47,7 @@ base class InterceptedClient extends BaseClient {
       }
 
       for (final interceptor in _interceptors) {
-        if (state.action == InterceptorAction.reject) {
+        if (!state.action.canGoNext) {
           break;
         }
 
