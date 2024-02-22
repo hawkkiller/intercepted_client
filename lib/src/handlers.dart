@@ -2,9 +2,9 @@ part of 'client.dart';
 
 /// BaseHandler
 abstract base class Handler {
-  Handler(this.state);
+  Handler(this._state);
 
-  final InterceptorState state;
+  final InterceptorState _state;
 
   final _completer = Completer<InterceptorState>();
 
@@ -20,7 +20,7 @@ final class RequestHandler extends Handler {
   /// Rejects the request.
   void rejectRequest(Object error, {bool next = false}) {
     _completer.completeError(
-      state.copyWith(
+      _state.copyWith(
         error: error,
         action: next ? InterceptorAction.rejectAllowNext : InterceptorAction.reject,
       ),
@@ -31,17 +31,14 @@ final class RequestHandler extends Handler {
   /// Goes to the next interceptor.
   void next(BaseRequest request) {
     _completer.complete(
-      state.copyWith(
-        request: request,
-        action: InterceptorAction.next,
-      ),
+      _state.copyWith(request: request, action: InterceptorAction.next),
     );
   }
 
   /// Resolves the request.
   void resolveResponse(StreamedResponse response, {bool next = false}) {
     _completer.complete(
-      state.copyWith(
+      _state.copyWith(
         response: response,
         action: next ? InterceptorAction.resolveAllowNext : InterceptorAction.resolve,
       ),
@@ -57,7 +54,7 @@ final class ResponseHandler extends Handler {
   /// Rejects the response.
   void rejectResponse(Object error, {bool next = false}) {
     _completer.completeError(
-      state.copyWith(
+      _state.copyWith(
         error: error,
         action: next ? InterceptorAction.rejectAllowNext : InterceptorAction.reject,
       ),
@@ -68,7 +65,7 @@ final class ResponseHandler extends Handler {
   /// Resolves the response.
   void resolveResponse(StreamedResponse response, {bool next = true}) {
     _completer.complete(
-      state.copyWith(
+      _state.copyWith(
         response: response,
         action: next ? InterceptorAction.resolveAllowNext : InterceptorAction.resolve,
       ),
@@ -84,7 +81,7 @@ final class ErrorHandler extends Handler {
   /// Rejects other interceptors.
   void rejectError(Object error, {bool next = true}) {
     _completer.completeError(
-      state.copyWith(
+      _state.copyWith(
         error: error,
         action: next ? InterceptorAction.rejectAllowNext : InterceptorAction.reject,
       ),
@@ -95,7 +92,7 @@ final class ErrorHandler extends Handler {
   /// Resolves with response.
   void resolveResponse(StreamedResponse response) {
     _completer.complete(
-      state.copyWith(
+      _state.copyWith(
         response: response,
         action: InterceptorAction.resolve,
       ),
