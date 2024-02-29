@@ -1,5 +1,6 @@
 part of 'client.dart';
 
+/// Interceptor signature.
 typedef Interceptor<T extends Object, H extends Handler, R> = R Function(
   T value,
   H handler,
@@ -37,11 +38,38 @@ base class InterceptorState {
     this.error,
   });
 
+  /// The action of the interceptor.
+  ///
+  /// Every interceptor sets this value to indicate what should be done next.
+  /// For the first one, this value is always [InterceptorAction.next] and
+  /// inner machinery must treat this value to understand what to do next.
   final InterceptorAction action;
-  final BaseRequest? request;
+
+  /// The actual request to be sent.
+  ///
+  /// It can be modified by interceptors or changed to another request
+  /// if needed (but not recommended).
+  ///
+  /// It can't be null as it is always initialized.
+  final BaseRequest request;
+
+  /// The actual response.
+  ///
+  /// It can be modified by interceptors or changed to another response
+  /// if needed (for example, when retrying request).
+  ///
+  /// It can be null if request was not sent or if error occurred.
   final StreamedResponse? response;
+
+  /// The error that occurred.
+  ///
+  /// It can be modified by interceptors or changed to another error.
+  /// You may expect to see [SocketException] or [HttpException] here.
+  ///
+  /// It can be null if request was sent successfully and if response was received.
   final Object? error;
 
+  /// Creates a copy of this state with the given fields replaced by the new values.
   InterceptorState copyWith({
     BaseRequest? request,
     StreamedResponse? response,
@@ -56,7 +84,9 @@ base class InterceptorState {
       );
 }
 
-/// Interceptor that is used for both requests and responses.
+/// Base class for interceptor handlers.
+/// 
+/// It is used to handle the request, response, and error.
 class HttpInterceptor {
   /// Creates a new [HttpInterceptor].
   const HttpInterceptor();
@@ -73,21 +103,27 @@ class HttpInterceptor {
         interceptError: interceptError,
       );
 
-  /// Intercepts the request and returns a new request.
+  /// Intercepts the request
+  /// 
+  /// This method can update existing request or create a new one.
   void interceptRequest(
     BaseRequest request,
     RequestHandler handler,
   ) =>
       handler.next(request);
 
-  /// Intercepts the response and returns a new response.
+  /// Intercepts the response
+  /// 
+  /// This method can update existing response or create a new one.
   void interceptResponse(
     StreamedResponse response,
     ResponseHandler handler,
   ) =>
       handler.resolveResponse(response);
 
-  /// Intercepts the error and returns a new error or response.
+  /// Intercepts the error
+  /// 
+  /// This method can update existing error or create a new one.
   void interceptError(
     Object error,
     ErrorHandler handler,
@@ -160,8 +196,9 @@ final class _HttpInterceptorWrapper extends HttpInterceptor {
   }
 }
 
-final class _Task<T extends Object, H extends Handler> {
-  _Task({
+/// Sequential task for the queue.
+final class _SequentialTask<T extends Object, H extends Handler> {
+  _SequentialTask({
     required Interceptor<T, H, void> interceptor,
     required this.value,
     required H handler,
@@ -182,8 +219,9 @@ final class _Task<T extends Object, H extends Handler> {
   Future<InterceptorState> get future => _handler._future;
 }
 
-final class _TaskQueue extends QueueList<_Task> {
-  _TaskQueue() : super(5);
+/// Queue of sequential tasks.
+final class _SequentialTaskQueue extends QueueList<_SequentialTask> {
+  _SequentialTaskQueue() : super(5);
 
   /// Returns `true` if the queue is processing.
   bool get isProcessing => length > 0;
@@ -192,7 +230,7 @@ final class _TaskQueue extends QueueList<_Task> {
   Future<void>? _processing;
 
   @override
-  Future<InterceptorState> add(_Task element) async {
+  Future<InterceptorState> add(_SequentialTask element) async {
     super.add(element);
     _run();
 
@@ -225,9 +263,13 @@ final class _TaskQueue extends QueueList<_Task> {
       });
 }
 
-/// Sequential interceptor is type of [HttpInterceptor] that maintains
-/// queues of requests and responses. It is used to intercept requests and
-/// responses in the order they were added.
+/// Sequential interceptor that runs interceptors in sequence.
+/// 
+/// This way, every consecutive request is put in a queue and is processed
+/// only after the previous one is finished.
+/// 
+/// It uses 3 queues for requests, responses, and errors. This way, it is
+/// possible to handle requests, responses, and errors in sequence.
 class SequentialHttpInterceptor extends HttpInterceptor {
   /// Creates a new [SequentialHttpInterceptor].
   SequentialHttpInterceptor();
@@ -244,9 +286,9 @@ class SequentialHttpInterceptor extends HttpInterceptor {
         interceptError: interceptError,
       );
 
-  final _requestQueue = _TaskQueue();
-  final _responseQueue = _TaskQueue();
-  final _errorQueue = _TaskQueue();
+  final _requestQueue = _SequentialTaskQueue();
+  final _responseQueue = _SequentialTaskQueue();
+  final _errorQueue = _SequentialTaskQueue();
 
   @override
   Future<InterceptorState> _interceptRequest(
@@ -270,12 +312,12 @@ class SequentialHttpInterceptor extends HttpInterceptor {
       _queuedHandler(_errorQueue, error, handler, interceptError);
 
   Future<InterceptorState> _queuedHandler<T extends Object, H extends Handler>(
-    _TaskQueue taskQueue,
+    _SequentialTaskQueue taskQueue,
     T value,
     H handler,
     Interceptor<T, H, void> interceptor,
   ) {
-    final task = _Task(interceptor: interceptor, value: value, handler: handler);
+    final task = _SequentialTask(interceptor: interceptor, value: value, handler: handler);
     return taskQueue.add(task);
   }
 }

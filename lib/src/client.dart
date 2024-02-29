@@ -31,12 +31,12 @@ base class InterceptedClient extends BaseClient {
         }
 
         final requestHandler = RequestHandler(state);
-        state = await interceptor._interceptRequest(state.request!, requestHandler);
+        state = await interceptor._interceptRequest(state.request, requestHandler);
       }
 
       // If the request is not resolved, send it.
       if (!state.action.resolved) {
-        final response = await _inner.send(state.request!).onError(
+        final response = await _inner.send(state.request).onError(
               (error, stackTrace) => Error.throwWithStackTrace(
                 InterceptorState(request: state.request, error: error),
                 stackTrace,

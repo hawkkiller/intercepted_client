@@ -1,24 +1,28 @@
 import 'package:http/http.dart';
 import 'package:intercepted_client/intercepted_client.dart';
 
+class AuthInterceptor extends SequentialHttpInterceptor {
+  final String token;
+
+  AuthInterceptor(this.token);
+
+  @override
+  void interceptRequest(BaseRequest request, RequestHandler handler) {
+    request.headers['Authorization'] = 'Bearer $token';
+
+    handler.next(request);
+  }
+}
+
 Future<void> main() async {
-  final client = InterceptedClient(
-    inner: Client(),
+  final Client client = InterceptedClient(
     interceptors: [
-      HttpInterceptor.fromHandlers(
-        interceptRequest: (value, handler) {
-          print('Request: $value');
-          handler.rejectRequest(value, next: true);
-        },
-        interceptError: (value, handler) {
-          print('Error: $value');
-          handler.rejectError('Hello World', next: true);
-        },
-      ),
+      AuthInterceptor('my-token'),
     ],
   );
 
-  final response = await client.get(Uri.parse('https://jsonplaceholder.typicode.com/todos/1'));
+  final response = await client.get(Uri.parse('https://example.com'));
 
-  print('Response: ${response.body}');
+  // prints 'Bearer my-token'
+  print(response.request?.headers['Authorization']);
 }
