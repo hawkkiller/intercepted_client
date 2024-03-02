@@ -1,6 +1,6 @@
-library;
+library intercepted_client;
 
-export 'src/client.dart'
+export 'src/intercepted_client.dart'
     show
         InterceptedClient,
         InterceptorAction,

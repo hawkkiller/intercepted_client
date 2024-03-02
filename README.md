@@ -54,7 +54,7 @@ For example, an interceptor can be used to add an `Authorization` header to ever
 There are three methods that can be overridden:
 
 - `interceptRequest` - called before the request is sent, and can be used to modify the request, for example to add headers.
-- `interceptResponse` - called after the response is received. Note, that this method works only with StreamedResponse (not with Response). This means that you can't see the full response body in this method (it is possible, but not recommended), but you have access to the response headers and status code.
+- `interceptResponse` - called after the response is received. Note, that this method works only with StreamedResponse (not with Response). This means that you can't see the full response body in this method, but you have access to the response headers and status code.
 - `interceptError` - called when an error occurs during the request. This method can be used to retry the request or to perform any side effect.
 
 Each method receives a `RequestHandler`, `ResponseHandler` or `ErrorHandler` object, which can be used to continue, reject or resolve the request, response or error handling.

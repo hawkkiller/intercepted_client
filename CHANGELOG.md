@@ -1,3 +1,8 @@
+## 0.0.1-dev.6
+
+- Updated code comments
+- Added getters for request and response to Handler
+
 ## 0.0.1-dev.5
 
 - Updated documentation and examples

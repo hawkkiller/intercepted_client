@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart';
 import 'package:http/testing.dart';
-import 'package:intercepted_client/src/client.dart';
+import 'package:intercepted_client/src/intercepted_client.dart';
 import 'package:test/test.dart';
 
 class FakeSequentialHttpInterceptorHeaders extends SequentialHttpInterceptor {
