@@ -1,3 +1,11 @@
+## 0.0.1
+
+- Initial release
+
+## 0.0.1-dev.7
+
+- Changed class modifiers
+
 ## 0.0.1-dev.6
 
 - Updated code comments
