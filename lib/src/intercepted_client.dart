@@ -93,7 +93,7 @@ base class InterceptedClient extends BaseClient {
 ///
 /// It contains state of the request and provides methods to proceed to the next
 /// interceptor or to reject the request.
-abstract base class BaseHandler {
+abstract class BaseHandler {
   BaseHandler(this._state);
 
   /// Returns the request
@@ -113,7 +113,7 @@ abstract base class BaseHandler {
 }
 
 /// Handler that is used for requests
-final class RequestHandler extends BaseHandler {
+class RequestHandler extends BaseHandler {
   /// Creates a new [RequestHandler].
   RequestHandler(super.state);
 
@@ -159,7 +159,7 @@ final class RequestHandler extends BaseHandler {
 }
 
 /// Handler that is used for responses.
-final class ResponseHandler extends BaseHandler {
+class ResponseHandler extends BaseHandler {
   /// Creates a new [ResponseHandler].
   ResponseHandler(super.state);
 
@@ -198,7 +198,7 @@ final class ResponseHandler extends BaseHandler {
 }
 
 /// Handler that is used for errors.
-final class ErrorHandler extends BaseHandler {
+class ErrorHandler extends BaseHandler {
   /// Creates a new [ErrorHandler].
   ErrorHandler(super.state);
 
