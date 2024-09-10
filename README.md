@@ -64,7 +64,7 @@ Each method can be overridden independently, so you can create an interceptor th
 Here you can see an example of a simple `HttpInterceptor` that logs the request and response:
 
 ```dart
-class LogInterceptor implements HttpInterceptor {
+class LogInterceptor extends HttpInterceptor {
   @override
   void interceptRequest(BaseRequest request, RequestHandler handler) {
     print('Request: ${request.url}');
@@ -72,15 +72,15 @@ class LogInterceptor implements HttpInterceptor {
   }
 
   @override
-  void interceptResponse(Response response, ResponseHandler handler) {
+  void interceptResponse(StreamedResponse response, ResponseHandler handler) {
     print('Response: ${response.statusCode}');
-    handler.next(response);
+    handler.resolveResponse(response);
   }
 
   @override
-  void interceptError(dynamic error, ErrorHandler handler) {
+  void interceptError(Object error, ErrorHandler handler) {
     print('Error: $error');
-    handler.next(error);
+    handler.rejectError(error);
   }
 }
 ```
